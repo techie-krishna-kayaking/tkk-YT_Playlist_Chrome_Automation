@@ -1,0 +1,18 @@
+# Core dependencies
+PyYAML>=6.0.1
+loguru>=0.7.2
+psutil>=5.9.8
+
+# Optional: browser automation / playback control (used only when
+# playback.mode == "playwright"). Install with: playwright install chromium
+playwright>=1.44.0
+
+# Windows-only window management dependencies.
+# These are guarded by environment markers so `pip install -r requirements.txt`
+# works on macOS/Linux too (they simply won't be installed there).
+pygetwindow>=0.0.9 ; sys_platform == "win32"
+pywinauto>=0.6.8 ; sys_platform == "win32"
+pywin32>=306 ; sys_platform == "win32"
+
+# Testing (optional, for `pytest`)
+pytest>=8.2.0

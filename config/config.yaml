@@ -1,0 +1,122 @@
+# ---------------------------------------------------------------------------
+# Chrome Multi-Profile Playlist Automation - Configuration
+# ---------------------------------------------------------------------------
+# Every value below has a sensible default in code. Leave a key empty (or omit
+# it) to fall back to the built-in default. Paths and profiles are auto-detected
+# when left blank.
+# ---------------------------------------------------------------------------
+
+# Absolute path to the Chrome executable.
+# Leave blank to auto-detect (recommended). Examples:
+#   Windows: C:\Program Files\Google\Chrome\Application\chrome.exe
+#   macOS:   /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+#   Linux:   /usr/bin/google-chrome
+chrome_path:
+
+# Absolute path to the Chrome "User Data" directory.
+# Leave blank to auto-detect from the OS default location.
+#   Windows: %LOCALAPPDATA%\Google\Chrome\User Data
+#   macOS:   ~/Library/Application Support/Google/Chrome
+#   Linux:   ~/.config/google-chrome
+user_data_dir:
+
+# Profiles to launch, by their *directory* name (not the friendly display name).
+# Leave the list empty to launch ALL discovered profiles.
+# Use `python main.py --list-profiles` to see available profile directories.
+profiles:
+  # - Default
+  # - Profile 1
+  # - Profile 2
+  # - Profile 3
+
+# Profile directory names to always exclude (applied even when `profiles` is empty).
+exclude_profiles:
+  - System Profile
+  - Guest Profile
+
+# Playlist / page URLs opened in each profile (one tab per URL).
+# Not limited to YouTube - any URL works (Spotify, YouTube Music, etc.).
+playlists:
+  - https://www.youtube.com/playlist?list=PLhXtefn-T4niM2CVlLpSgZ_OeCB-Mc1Wl
+  - https://www.youtube.com/playlist?list=PLa5XMNBdj8aE
+  - https://www.youtube.com/playlist?list=PLHk1B-E9xLDQQ2rjnQ2dqRfmXipW-wFih
+
+# Seconds to wait after fully launching one profile before starting the next.
+delay_between_profiles: 8
+
+# Seconds to wait between opening consecutive tabs within a profile.
+delay_between_tabs: 2
+
+# Seconds to wait after launching Chrome before it is considered "ready".
+launch_ready_timeout: 20
+
+# Per-window sizing (used for grid arrangement).
+window:
+  width: 650
+  height: 500
+
+# Grid arrangement of the launched windows on screen.
+grid:
+  # auto_fit: true  -> IGNORE window size/columns below and automatically tile
+  #                    ALL launched windows to fit on your screen (video-wall).
+  #                    Recommended when launching many profiles.
+  # auto_fit: false -> use the fixed window size + columns exactly as set.
+  auto_fit: true
+  columns: 3
+  # Pixel gap between windows.
+  padding: 8
+  # Top-left origin of the grid.
+  origin_x: 0
+  origin_y: 0
+  # Optional: force a screen size (0 = auto-detect the primary display).
+  screen_width: 0
+  screen_height: 0
+
+# Playback behaviour.
+playback:
+  # true  -> attempt to ensure playback starts.
+  # false -> just open the tabs, do nothing else.
+  autoplay: true
+  # How playback is driven:
+  #   native     -> rely on the URL / Chrome autoplay only (no automation lib).
+  #   playwright -> connect via remote debugging and click/space to force play.
+  mode: native
+  # Base port for --remote-debugging-port. Each profile gets base + index.
+  remote_debugging_port: 9222
+  # CSS selectors tried (in order) to find and click a play button.
+  play_selectors:
+    - ".ytp-large-play-button"          # YouTube big center play button
+    - ".ytp-play-button[aria-label*='Play']"
+    - "a[href*='watch']#play-all"        # YouTube playlist "Play all" link
+    - "button[aria-label='Play']"
+    - "button[title='Play']"
+    - "button[data-testid='play-button']"  # Spotify
+    - "button.play"
+
+# Concurrency / orchestration.
+execution:
+  # Launch profiles in parallel instead of one-by-one.
+  parallel: false
+  # Max Chrome windows launched at the same time when parallel is true.
+  max_concurrent: 3
+  # Retry attempts per profile before giving up.
+  retries: 2
+  # Seconds between retry attempts.
+  retry_delay: 3
+
+# Logging.
+logging:
+  level: INFO
+  dir: logs
+  app_log: automation.log
+  error_log: errors.log
+  # Rotate log files once they reach this size.
+  rotation: "10 MB"
+  # How long to keep rotated logs.
+  retention: "14 days"
+
+# Write a machine-readable JSON execution report at the end of a run.
+report:
+  enabled: true
+  dir: logs
+  filename: execution_report.json
