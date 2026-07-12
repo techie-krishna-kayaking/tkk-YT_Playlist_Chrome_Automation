@@ -51,7 +51,9 @@ class Launcher:
         self._playback = PlaywrightPlaybackController(config.playback)
 
         self._playlists: list[Playlist] = build_playlists(
-            config.playlists, autoplay=config.playback.autoplay
+            config.playlists,
+            autoplay=config.playback.autoplay,
+            loop=config.playback.loop,
         )
         self._interrupted = False
 

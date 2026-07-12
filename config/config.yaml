@@ -57,17 +57,26 @@ window:
 
 # Grid arrangement of the launched windows on screen.
 grid:
+  # cascade: true   -> keep each window SMALL (the `window` size above) and
+  #                    stack them on top of each other with a diagonal offset,
+  #                    so every window stays visible (the overlapping look).
+  #                    Takes precedence over auto_fit.
+  cascade: true
+  # Diagonal offset (in pixels) between each cascaded window.
+  cascade_offset_x: 40
+  cascade_offset_y: 40
   # auto_fit: true  -> IGNORE window size/columns below and automatically tile
   #                    ALL launched windows to fit on your screen (video-wall).
   #                    Recommended when launching many profiles.
   # auto_fit: false -> use the fixed window size + columns exactly as set.
-  auto_fit: true
+  #                    (Ignored while cascade is true.)
+  auto_fit: false
   columns: 3
   # Pixel gap between windows.
   padding: 8
-  # Top-left origin of the grid.
-  origin_x: 0
-  origin_y: 0
+  # Top-left origin of the grid / cascade.
+  origin_x: 40
+  origin_y: 40
   # Optional: force a screen size (0 = auto-detect the primary display).
   screen_width: 0
   screen_height: 0
@@ -77,6 +86,9 @@ playback:
   # true  -> attempt to ensure playback starts.
   # false -> just open the tabs, do nothing else.
   autoplay: true
+  # true  -> loop the playlist so it repeats after the last video.
+  # false -> stop when the playlist ends.
+  loop: true
   # How playback is driven:
   #   native     -> rely on the URL / Chrome autoplay only (no automation lib).
   #   playwright -> connect via remote debugging and click/space to force play.

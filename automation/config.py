@@ -46,6 +46,12 @@ class GridConfig:
     # When True, ignore the fixed window size / columns and instead tile ALL
     # launched windows to fit on the detected screen (a video-wall layout).
     auto_fit: bool = True
+    # When True, stack the (small) windows on top of each other with a fixed
+    # diagonal offset - a "cascade" layout. Takes precedence over auto_fit.
+    cascade: bool = False
+    # Pixel offset applied to each successive cascaded window.
+    cascade_offset_x: int = 40
+    cascade_offset_y: int = 40
     # Optional explicit screen size overrides (0 = auto-detect).
     screen_width: int = 0
     screen_height: int = 0
@@ -62,6 +68,9 @@ class GridConfig:
             origin_x=int(data.get("origin_x", 0)),
             origin_y=int(data.get("origin_y", 0)),
             auto_fit=bool(data.get("auto_fit", True)),
+            cascade=bool(data.get("cascade", False)),
+            cascade_offset_x=int(data.get("cascade_offset_x", 40)),
+            cascade_offset_y=int(data.get("cascade_offset_y", 40)),
             screen_width=int(data.get("screen_width", 0)),
             screen_height=int(data.get("screen_height", 0)),
         )
@@ -72,6 +81,7 @@ class PlaybackConfig:
     """Playback behaviour and Playwright connection settings."""
 
     autoplay: bool = True
+    loop: bool = True
     mode: str = "native"  # "native" | "playwright"
     remote_debugging_port: int = 9222
     play_selectors: list[str] = field(
@@ -92,6 +102,7 @@ class PlaybackConfig:
         selectors = data.get("play_selectors")
         cfg = cls(
             autoplay=bool(data.get("autoplay", True)),
+            loop=bool(data.get("loop", True)),
             mode=mode,
             remote_debugging_port=int(data.get("remote_debugging_port", 9222)),
         )

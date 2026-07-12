@@ -171,12 +171,78 @@ def compute_auto_grid(
     return cells
 
 
+def compute_cascade(
+    count: int,
+    window: WindowConfig,
+    grid: GridConfig,
+    screen: tuple[int, int],
+) -> list[GridCell]:
+    """Stack ``count`` small windows on top of each other with a diagonal offset.
+
+    Produces the classic "cascade" look where each window keeps the configured
+    (small) size and is shifted down-right from the previous one, so every title
+    bar stays visible. When the cascade would run off the screen it wraps back
+    to the origin, starting a new overlapping stack.
+
+    Args:
+        count: Number of windows to place.
+        window: Per-window width/height (kept as-is; windows stay small).
+        grid: Grid layout (origin + cascade offsets honoured).
+        screen: ``(width, height)`` of the target screen in pixels.
+
+    Returns:
+        A list of :class:`GridCell` positions/sizes, in launch order.
+    """
+    if count <= 0:
+        return []
+
+    screen_w, screen_h = screen
+    usable_h = max(200, screen_h - _SCREEN_MARGIN_Y)
+    win_w = window.width
+    win_h = window.height
+    off_x = max(0, grid.cascade_offset_x)
+    off_y = max(0, grid.cascade_offset_y)
+
+    cells: list[GridCell] = []
+    step = 0
+    for index in range(count):
+        x = grid.origin_x + step * off_x
+        y = grid.origin_y + step * off_y
+        # Wrap back to the origin if the next window would fall off-screen.
+        if (x + win_w > screen_w or y + win_h > usable_h) and step > 0:
+            step = 0
+            x = grid.origin_x
+            y = grid.origin_y
+        cells.append(GridCell(index=index, x=x, y=y, width=win_w, height=win_h))
+        step += 1
+
+    logger.info(
+        "Cascade layout: {} windows at {}x{} px each, offset ({}, {}) on a "
+        "{}x{} screen.",
+        count,
+        win_w,
+        win_h,
+        off_x,
+        off_y,
+        screen_w,
+        screen_h,
+    )
+    return cells
+
+
 def build_grid(
     count: int,
     window: WindowConfig,
     grid: GridConfig,
 ) -> list[GridCell]:
-    """Return grid cells using auto-fit when enabled, else the fixed layout."""
+    """Return grid cells using the configured layout.
+
+    Precedence: ``cascade`` (overlapping stack) > ``auto_fit`` (video wall) >
+    fixed grid.
+    """
+    if grid.cascade:
+        screen = detect_screen_size(grid.screen_width, grid.screen_height)
+        return compute_cascade(count, window, grid, screen)
     if grid.auto_fit:
         screen = detect_screen_size(grid.screen_width, grid.screen_height)
         return compute_auto_grid(count, grid, screen)
