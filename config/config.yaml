@@ -62,22 +62,25 @@ grid:
   #                    stack them on top of each other with a diagonal offset,
   #                    so every window stays visible (the overlapping look).
   #                    Takes precedence over auto_fit.
-  cascade: true
+  cascade: false
   # Diagonal offset (in pixels) between each cascaded window.
   cascade_offset_x: 40
   cascade_offset_y: 40
-  # auto_fit: true  -> IGNORE window size/columns below and automatically tile
-  #                    ALL launched windows to fit on your screen (video-wall).
-  #                    Recommended when launching many profiles.
+  # auto_fit: true  -> IGNORE window size below and automatically tile ALL
+  #                    launched windows to fit on your screen (video-wall).
   # auto_fit: false -> use the fixed window size + columns exactly as set.
   #                    (Ignored while cascade is true.)
-  auto_fit: false
+  auto_fit: true
+  # fill_columns: how many windows per row in the auto-fit layout before
+  # wrapping to the next row. 0 = auto-pick from the screen aspect ratio.
+  # Set to 5 to place 5 windows across, then continue on the next row.
+  fill_columns: 5
   columns: 3
   # Pixel gap between windows.
   padding: 8
   # Top-left origin of the grid / cascade.
-  origin_x: 40
-  origin_y: 40
+  origin_x: 0
+  origin_y: 0
   # Optional: force a screen size (0 = auto-detect the primary display).
   screen_width: 0
   screen_height: 0

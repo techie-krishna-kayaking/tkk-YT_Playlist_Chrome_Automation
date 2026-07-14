@@ -133,6 +133,7 @@ class LaunchOptions:
     position_y: int = 0
     remote_debugging_port: int | None = None
     load_extension: Path | None = None
+    autoplay: bool = False
     extra_args: list[str] = field(default_factory=list)
 
 
@@ -174,14 +175,37 @@ class ChromeLauncher:
         ]
         if options.remote_debugging_port:
             args.append(f"--remote-debugging-port={options.remote_debugging_port}")
+
+        # Chrome only honours a single --disable-features switch, so collect all
+        # features we want disabled and emit one combined flag at the end.
+        disabled_features: list[str] = []
+
+        if options.autoplay:
+            # Force media to autoplay without a user gesture and keep background
+            # / occluded tabs and windows fully alive so *every* tab plays, not
+            # just the visible one.
+            args.extend(
+                [
+                    "--autoplay-policy=no-user-gesture-required",
+                    "--disable-background-timer-throttling",
+                    "--disable-backgrounding-occluded-windows",
+                    "--disable-renderer-backgrounding",
+                ]
+            )
+            # Occlusion detection can pause rendering of tiled/overlapping
+            # windows; disabling it keeps them playing.
+            disabled_features.append("CalculateNativeWinOcclusion")
+
         if options.load_extension:
             # Load the bundled loop extension. Chrome 137+ disables the
             # --load-extension switch by default, so we also re-enable it via
             # the accompanying feature flag.
             args.append(f"--load-extension={options.load_extension}")
-            args.append(
-                "--disable-features=DisableLoadExtensionCommandLineSwitch"
-            )
+            disabled_features.append("DisableLoadExtensionCommandLineSwitch")
+
+        if disabled_features:
+            args.append("--disable-features=" + ",".join(disabled_features))
+
         args.extend(options.extra_args)
         args.extend(options.urls)
         return args

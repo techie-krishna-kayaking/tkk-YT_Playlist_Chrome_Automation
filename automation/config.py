@@ -46,6 +46,10 @@ class GridConfig:
     # When True, ignore the fixed window size / columns and instead tile ALL
     # launched windows to fit on the detected screen (a video-wall layout).
     auto_fit: bool = True
+    # Number of columns to use for the auto-fit (video-wall) layout. 0 means
+    # auto-pick a column count from the screen aspect ratio. Set e.g. 5 to force
+    # exactly 5 windows per row, wrapping to the next row after that.
+    fill_columns: int = 0
     # When True, stack the (small) windows on top of each other with a fixed
     # diagonal offset - a "cascade" layout. Takes precedence over auto_fit.
     cascade: bool = False
@@ -68,6 +72,7 @@ class GridConfig:
             origin_x=int(data.get("origin_x", 0)),
             origin_y=int(data.get("origin_y", 0)),
             auto_fit=bool(data.get("auto_fit", True)),
+            fill_columns=max(0, int(data.get("fill_columns", 0))),
             cascade=bool(data.get("cascade", False)),
             cascade_offset_x=int(data.get("cascade_offset_x", 40)),
             cascade_offset_y=int(data.get("cascade_offset_y", 40)),

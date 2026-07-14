@@ -120,6 +120,7 @@ def compute_auto_grid(
     count: int,
     grid: GridConfig,
     screen: tuple[int, int],
+    columns_override: int | None = None,
 ) -> list[GridCell]:
     """Tile ``count`` windows to fit entirely on the given screen.
 
@@ -131,6 +132,8 @@ def compute_auto_grid(
         count: Number of windows to place.
         grid: Grid layout (padding/origin honoured; columns ignored).
         screen: ``(width, height)`` of the target screen in pixels.
+        columns_override: When > 0, force this many columns (windows per row)
+            instead of picking a column count from the screen aspect ratio.
 
     Returns:
         A list of :class:`GridCell` positions/sizes, row-major.
@@ -142,8 +145,12 @@ def compute_auto_grid(
     usable_h = max(200, screen_h - _SCREEN_MARGIN_Y)
     pad = max(0, grid.padding)
 
-    # Pick columns so tiles roughly match the screen aspect ratio.
-    columns = max(1, min(count, round(math.sqrt(count * screen_w / usable_h))))
+    if columns_override and columns_override > 0:
+        # Force an exact number of windows per row (wrapping to the next row).
+        columns = max(1, min(count, columns_override))
+    else:
+        # Pick columns so tiles roughly match the screen aspect ratio.
+        columns = max(1, min(count, round(math.sqrt(count * screen_w / usable_h))))
     rows = math.ceil(count / columns)
 
     cell_w = max(360, (screen_w - (columns + 1) * pad) // columns)
@@ -245,7 +252,7 @@ def build_grid(
         return compute_cascade(count, window, grid, screen)
     if grid.auto_fit:
         screen = detect_screen_size(grid.screen_width, grid.screen_height)
-        return compute_auto_grid(count, grid, screen)
+        return compute_auto_grid(count, grid, screen, grid.fill_columns)
     return compute_grid(count, window, grid)
 
 

@@ -1,24 +1,30 @@
 /*
- * TKK Playlist Loop + Shuffle - content script.
+ * TKK Playlist Loop + Shuffle + Autoplay - content script.
  *
  * YouTube ignores `loop` / `shuffle` query parameters on the normal /watch page
  * (they only work in the embed player), so the only reliable way to enable them
  * on the watch page is to click YouTube's own "Loop" and "Shuffle" toggles in
  * the playlist panel.
  *
- * This script waits for the playlist panel to appear and clicks each toggle
- * exactly once per page load. Because a freshly launched Chrome window always
- * starts with both toggles OFF, a single click reliably turns each ON, and
- * YouTube keeps them on for the rest of the session (they survive the SPA
- * navigation between videos, so we never need to click again).
+ * In addition, Chrome does not autoplay media in background / non-active tabs,
+ * so when several playlist tabs are opened per window only the visible one
+ * starts. Because this content script runs in EVERY tab (visible or hidden), it
+ * also force-starts playback by calling video.play() / clicking the play button
+ * until the video is playing. Combined with the launch flag
+ * --autoplay-policy=no-user-gesture-required, this makes every tab play.
+ *
+ * The loop/shuffle toggles are clicked exactly once per page load; the play
+ * watchdog keeps running so a tab that gets paused (e.g. a "Video paused,
+ * continue watching?" prompt, or a late-loading player) is resumed.
  */
 (function () {
   "use strict";
 
   var LOOP_DONE = false;
   var SHUFFLE_DONE = false;
-  var DEADLINE = Date.now() + 90 * 1000; // keep trying for up to 90s
-  var POLL_MS = 1000;
+  var TOGGLE_DEADLINE = Date.now() + 90 * 1000; // try toggles for up to 90s
+  var TOGGLE_POLL_MS = 1000;
+  var PLAY_POLL_MS = 2500;
 
   function onPlaylistPage() {
     // Only act when a playlist is actually loaded (?list=... present).
@@ -85,7 +91,40 @@
     return true;
   }
 
-  var timer = setInterval(function () {
+  // Force the video to play if it is paused. Runs in every tab, including
+  // hidden/background ones, so all playlists start rather than only the visible
+  // one.
+  function ensurePlaying() {
+    var video = document.querySelector("video");
+    if (!video) {
+      return;
+    }
+    if (video.paused) {
+      var promise = null;
+      try {
+        promise = video.play();
+      } catch (e) {
+        promise = null;
+      }
+      if (promise && typeof promise.catch === "function") {
+        promise.catch(function () {
+          // Autoplay was blocked; fall back to clicking the play button.
+          var btn = document.querySelector(
+            ".ytp-large-play-button, .ytp-play-button"
+          );
+          if (btn && video.paused) {
+            try {
+              btn.click();
+            } catch (e2) {
+              /* ignore */
+            }
+          }
+        });
+      }
+    }
+  }
+
+  var toggleTimer = setInterval(function () {
     if (onPlaylistPage()) {
       if (!LOOP_DONE) {
         LOOP_DONE = tryEnable("loop");
@@ -94,8 +133,11 @@
         SHUFFLE_DONE = tryEnable("shuffle");
       }
     }
-    if ((LOOP_DONE && SHUFFLE_DONE) || Date.now() > DEADLINE) {
-      clearInterval(timer);
+    if ((LOOP_DONE && SHUFFLE_DONE) || Date.now() > TOGGLE_DEADLINE) {
+      clearInterval(toggleTimer);
     }
-  }, POLL_MS);
+  }, TOGGLE_POLL_MS);
+
+  // Keep nudging playback for the life of the tab.
+  setInterval(ensurePlaying, PLAY_POLL_MS);
 })();

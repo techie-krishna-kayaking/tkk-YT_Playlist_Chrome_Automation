@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "TKK Playlist Loop + Shuffle",
-  "version": "1.1.0",
-  "description": "Automatically turns on YouTube's Loop and Shuffle toggles on playlist watch pages so the playlist repeats forever in shuffled order.",
+  "version": "1.2.0",
+  "description": "Turns on YouTube's Loop and Shuffle on playlist watch pages and force-starts playback in every tab (including hidden/background tabs).",
   "content_scripts": [
     {
       "matches": ["*://www.youtube.com/*", "*://music.youtube.com/*"],

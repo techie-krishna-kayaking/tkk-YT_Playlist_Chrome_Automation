@@ -225,6 +225,7 @@ class Launcher:
             position_y=cell.y,
             remote_debugging_port=port,
             load_extension=load_extension,
+            autoplay=self._config.playback.autoplay,
         )
 
         result = self._chrome.launch(options, dry_run=self._dry_run)
