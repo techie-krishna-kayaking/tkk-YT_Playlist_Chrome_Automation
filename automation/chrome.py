@@ -132,6 +132,7 @@ class LaunchOptions:
     position_x: int = 0
     position_y: int = 0
     remote_debugging_port: int | None = None
+    load_extension: Path | None = None
     extra_args: list[str] = field(default_factory=list)
 
 
@@ -173,6 +174,14 @@ class ChromeLauncher:
         ]
         if options.remote_debugging_port:
             args.append(f"--remote-debugging-port={options.remote_debugging_port}")
+        if options.load_extension:
+            # Load the bundled loop extension. Chrome 137+ disables the
+            # --load-extension switch by default, so we also re-enable it via
+            # the accompanying feature flag.
+            args.append(f"--load-extension={options.load_extension}")
+            args.append(
+                "--disable-features=DisableLoadExtensionCommandLineSwitch"
+            )
         args.extend(options.extra_args)
         args.extend(options.urls)
         return args

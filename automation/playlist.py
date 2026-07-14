@@ -45,7 +45,7 @@ def _youtube_playlist_id(parsed) -> str | None:
     return values[0] if values else None
 
 
-def _augment_autoplay(url: str, provider: str, parsed, loop: bool = False) -> str:
+def _augment_autoplay(url: str, provider: str, parsed) -> str:
     """Rewrite/augment a URL so playback actually starts.
 
     A YouTube ``/playlist?list=ID`` URL only shows the playlist landing page
@@ -53,39 +53,35 @@ def _augment_autoplay(url: str, provider: str, parsed, loop: bool = False) -> st
     ``/watch?list=ID&playnext=1`` form loads the first video and begins
     playback. For other YouTube pages we just append ``autoplay=1``.
 
-    When ``loop`` is True, ``&loop=1`` is added so YouTube repeats the whole
-    playlist once it reaches the end.
+    Note: looping is intentionally *not* handled here. YouTube ignores a
+    ``loop`` query parameter on the ``/watch`` page (it only works in the embed
+    player), so looping is enabled separately by the bundled loop extension
+    that clicks YouTube's own loop toggle. See ``automation.launcher`` and
+    ``assets/loop_extension``.
     """
     if provider not in {"youtube", "youtube_music"}:
         return url
-
-    loop_param = "&loop=1" if loop else ""
 
     playlist_id = _youtube_playlist_id(parsed)
     if playlist_id:
         host = parsed.netloc or "www.youtube.com"
         return (
             f"{parsed.scheme}://{host}/watch"
-            f"?list={playlist_id}&playnext=1&index=1&autoplay=1{loop_param}"
+            f"?list={playlist_id}&playnext=1&index=1&autoplay=1"
         )
 
     if "autoplay=" not in url:
         separator = "&" if "?" in url else "?"
-        url = f"{url}{separator}autoplay=1"
-    if loop and "loop=" not in url:
-        url = f"{url}&loop=1"
+        return f"{url}{separator}autoplay=1"
     return url
 
 
-def build_playlists(
-    urls: list[str], autoplay: bool, loop: bool = False
-) -> list[Playlist]:
+def build_playlists(urls: list[str], autoplay: bool) -> list[Playlist]:
     """Validate and normalise configured URLs into :class:`Playlist` objects.
 
     Args:
         urls: Raw URL strings from configuration.
         autoplay: Whether to append provider autoplay hints.
-        loop: Whether to append provider loop hints so the playlist repeats.
 
     Returns:
         A list of valid :class:`Playlist` objects. Invalid URLs are skipped.
@@ -100,6 +96,6 @@ def build_playlists(
             logger.warning("Skipping invalid URL (must be http/https): {}", raw)
             continue
         provider = _classify(parsed.netloc)
-        url = _augment_autoplay(raw, provider, parsed, loop) if autoplay else raw
+        url = _augment_autoplay(raw, provider, parsed) if autoplay else raw
         playlists.append(Playlist(url=url, original_url=raw, provider=provider))
     return playlists

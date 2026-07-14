@@ -40,6 +40,7 @@ playlists:
   - https://www.youtube.com/playlist?list=PLhXtefn-T4niM2CVlLpSgZ_OeCB-Mc1Wl
   - https://www.youtube.com/playlist?list=PLa5XMNBdj8aE
   - https://www.youtube.com/playlist?list=PLHk1B-E9xLDQQ2rjnQ2dqRfmXipW-wFih
+  - https://www.youtube.com/playlist?list=PLNa59xPGRExQ
 
 # Seconds to wait after fully launching one profile before starting the next.
 delay_between_profiles: 8
@@ -87,6 +88,12 @@ playback:
   # false -> just open the tabs, do nothing else.
   autoplay: true
   # true  -> loop the playlist so it repeats after the last video.
+  #          Also turns on Shuffle so the playlist plays in random order.
+  #          YouTube ignores "loop"/"shuffle" URL parameters on the /watch page,
+  #          so this loads a small bundled extension (assets/loop_extension)
+  #          that clicks YouTube's own Loop and Shuffle toggles on each playlist.
+  #          Note: modern Chrome may show a one-time "disable developer mode
+  #          extensions" prompt; just dismiss it (click the X) to keep it on.
   # false -> stop when the playlist ends.
   loop: true
   # How playback is driven:

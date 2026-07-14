@@ -51,11 +51,23 @@ class Launcher:
         self._playback = PlaywrightPlaybackController(config.playback)
 
         self._playlists: list[Playlist] = build_playlists(
-            config.playlists,
-            autoplay=config.playback.autoplay,
-            loop=config.playback.loop,
+            config.playlists, autoplay=config.playback.autoplay
         )
+        self._loop_extension_dir = self._resolve_loop_extension()
         self._interrupted = False
+
+    @staticmethod
+    def _resolve_loop_extension() -> Path | None:
+        """Return the bundled loop-extension directory if it exists."""
+        ext_dir = (
+            Path(__file__).resolve().parent.parent / "assets" / "loop_extension"
+        )
+        if (ext_dir / "manifest.json").is_file():
+            return ext_dir
+        logger.warning(
+            "Loop extension not found at {}; playlists will not loop.", ext_dir
+        )
+        return None
 
     # ------------------------------------------------------------------ API
     def list_profiles(self) -> list[ChromeProfile]:
@@ -199,6 +211,10 @@ class Launcher:
         if self._config.playback.mode == "playwright" and self._config.playback.autoplay:
             port = self._config.playback.remote_debugging_port + cell.index
 
+        load_extension = (
+            self._loop_extension_dir if self._config.playback.loop else None
+        )
+
         options = LaunchOptions(
             profile_directory=profile.directory,
             urls=[p.url for p in self._playlists],
@@ -208,6 +224,7 @@ class Launcher:
             position_x=cell.x,
             position_y=cell.y,
             remote_debugging_port=port,
+            load_extension=load_extension,
         )
 
         result = self._chrome.launch(options, dry_run=self._dry_run)
