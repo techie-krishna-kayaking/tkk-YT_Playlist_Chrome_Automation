@@ -8,6 +8,7 @@ still produces a valid, runnable configuration.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
@@ -17,6 +18,32 @@ import yaml
 
 class ConfigError(Exception):
     """Raised when configuration is missing or invalid."""
+
+
+def _load_dotenv(path: Path) -> None:
+    """Load ``KEY=VALUE`` pairs from a ``.env`` file into ``os.environ``.
+
+    Lines that are blank or start with ``#`` are ignored. Surrounding quotes on
+    values are stripped. Existing environment variables are never overwritten,
+    so a real environment value always wins over the file.
+    """
+    if not path.is_file():
+        return
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.lower().startswith("export "):
+            line = line[len("export ") :].lstrip()
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
 
 
 @dataclass
@@ -182,6 +209,58 @@ class ReportConfig:
 
 
 @dataclass
+class ScheduleConfig:
+    """Repeating play -> close Chrome -> wait -> relaunch cycle settings."""
+
+    enabled: bool = False
+    play_hours: float = 5.0
+    cooldown_minutes: float = 9.0
+    max_cycles: int = 0  # 0 = repeat forever
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any] | None) -> "ScheduleConfig":
+        data = data or {}
+        play_hours = float(data.get("play_hours", 5.0))
+        cooldown_minutes = float(data.get("cooldown_minutes", 9.0))
+        if play_hours < 0 or cooldown_minutes < 0:
+            raise ConfigError("schedule play_hours/cooldown_minutes must be >= 0.")
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            play_hours=play_hours,
+            cooldown_minutes=cooldown_minutes,
+            max_cycles=max(0, int(data.get("max_cycles", 0))),
+        )
+
+
+@dataclass
+class TelegramConfig:
+    """Telegram Bot API notification settings.
+
+    ``bot_token`` / ``chat_id`` may be set here or, preferably, via the
+    ``TELEGRAM_BOT_TOKEN`` / ``TELEGRAM_CHAT_ID`` environment variables (which
+    take precedence and keep secrets out of the config file).
+    """
+
+    enabled: bool = False
+    bot_token: str = ""
+    chat_id: str = ""
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any] | None) -> "TelegramConfig":
+        data = data or {}
+        token = str(data.get("bot_token", "") or "").strip()
+        chat_id = str(data.get("chat_id", "") or "").strip()
+        # Environment variables win over file values.
+        token = os.environ.get("TELEGRAM_BOT_TOKEN", token).strip()
+        chat_id = os.environ.get("TELEGRAM_CHAT_ID", chat_id).strip()
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            bot_token=token,
+            chat_id=chat_id,
+        )
+
+
+@dataclass
 class AppConfig:
     """Top-level, fully-typed application configuration."""
 
@@ -199,6 +278,8 @@ class AppConfig:
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     report: ReportConfig = field(default_factory=ReportConfig)
+    schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
+    telegram: TelegramConfig = field(default_factory=TelegramConfig)
 
     # Absolute path of the loaded config file, if any (used for hot reload).
     source_path: Path | None = None
@@ -233,6 +314,8 @@ class AppConfig:
             execution=ExecutionConfig.from_dict(data.get("execution")),
             logging=LoggingConfig.from_dict(data.get("logging")),
             report=ReportConfig.from_dict(data.get("report")),
+            schedule=ScheduleConfig.from_dict(data.get("schedule")),
+            telegram=TelegramConfig.from_dict(data.get("telegram")),
         )
 
     def validate(self) -> None:
@@ -263,6 +346,10 @@ def load_config(path: str | Path) -> AppConfig:
     config_path = Path(path).expanduser().resolve()
     if not config_path.is_file():
         raise ConfigError(f"Config file not found: {config_path}")
+
+    # Load secrets from a project-root .env into the environment (without
+    # overriding any variables already set in the real environment).
+    _load_dotenv(config_path.parent.parent / ".env")
 
     try:
         with config_path.open("r", encoding="utf-8") as handle:

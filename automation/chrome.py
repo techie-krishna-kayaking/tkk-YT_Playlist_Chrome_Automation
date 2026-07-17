@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -24,6 +25,84 @@ class ChromeNotFoundError(Exception):
 
 class UserDataDirNotFoundError(Exception):
     """Raised when the Chrome User Data directory cannot be located."""
+
+
+def _chrome_running() -> bool:
+    """Return True if any Google Chrome process is currently running."""
+    try:
+        if Platform.is_windows():
+            out = subprocess.run(
+                ["tasklist", "/FI", "IMAGENAME eq chrome.exe"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            return "chrome.exe" in out.stdout.lower()
+        pattern = "Google Chrome" if Platform.is_macos() else "chrome"
+        out = subprocess.run(
+            ["pgrep", "-f", pattern],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        return bool(out.stdout.strip())
+    except Exception as exc:  # noqa: BLE001 - detection is best-effort
+        logger.debug("Chrome running-check failed: {}", exc)
+        return False
+
+
+def terminate_chrome(graceful_timeout: float = 12.0) -> bool:
+    """Close all running Google Chrome windows/processes.
+
+    Tries a graceful quit first (so the next launch does not show a crash-restore
+    bubble) and force-kills anything still alive afterwards.
+
+    Args:
+        graceful_timeout: Seconds to wait for a clean shutdown before force-kill.
+
+    Returns:
+        True if Chrome is confirmed stopped (or was not running).
+    """
+    if not _chrome_running():
+        logger.info("Chrome is not running; nothing to close.")
+        return True
+
+    logger.info("Closing Google Chrome (graceful)...")
+    try:
+        if Platform.is_windows():
+            subprocess.run(["taskkill", "/IM", "chrome.exe"], capture_output=True)
+        elif Platform.is_macos():
+            subprocess.run(
+                ["osascript", "-e", 'tell application "Google Chrome" to quit'],
+                capture_output=True,
+            )
+        else:  # Linux
+            subprocess.run(["pkill", "-TERM", "-f", "chrome"], capture_output=True)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Graceful Chrome quit failed: {}", exc)
+
+    deadline = time.monotonic() + max(0.0, graceful_timeout)
+    while time.monotonic() < deadline:
+        if not _chrome_running():
+            logger.info("Chrome closed gracefully.")
+            return True
+        time.sleep(0.5)
+
+    logger.warning("Chrome still running after {:.0f}s; force-killing.", graceful_timeout)
+    try:
+        if Platform.is_windows():
+            subprocess.run(["taskkill", "/F", "/IM", "chrome.exe"], capture_output=True)
+        elif Platform.is_macos():
+            subprocess.run(["pkill", "-9", "-f", "Google Chrome"], capture_output=True)
+        else:  # Linux
+            subprocess.run(["pkill", "-9", "-f", "chrome"], capture_output=True)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Force-kill of Chrome failed: {}", exc)
+
+    time.sleep(2.0)
+    stopped = not _chrome_running()
+    logger.info("Chrome stopped: {}", stopped)
+    return stopped
 
 
 def detect_chrome_path(explicit: str | None = None) -> Path:

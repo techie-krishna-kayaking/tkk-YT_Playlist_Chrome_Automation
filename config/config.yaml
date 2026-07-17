@@ -142,3 +142,35 @@ report:
   enabled: true
   dir: logs
   filename: execution_report.json
+
+# ---------------------------------------------------------------------------
+# Repeating cycle: play for a while, force-quit Chrome, wait, then relaunch.
+# ---------------------------------------------------------------------------
+schedule:
+  # true  -> run the loop: launch all profiles -> play -> close Chrome -> wait
+  #          -> relaunch, forever (or up to max_cycles).
+  # false -> just launch once and exit (the original behaviour).
+  enabled: true
+  # How long to keep the videos playing before closing Chrome (in hours).
+  play_hours: 5
+  # How long to wait after closing Chrome before relaunching (in minutes).
+  cooldown_minutes: 9
+  # Stop after this many cycles. 0 = repeat forever.
+  max_cycles: 0
+
+# ---------------------------------------------------------------------------
+# Telegram notifications (optional).
+# You get a message when all windows are opened, and again when Chrome closes.
+#
+# CREDENTIALS LIVE IN THE .env FILE (project root), NOT here, to keep secrets
+# out of version control. Set them in `.env`:
+#     TELEGRAM_BOT_TOKEN=123456789:ABCdEf...
+#     TELEGRAM_CHAT_ID=987654321
+# (See .env.example.) Values in .env / environment override anything below, so
+# leave bot_token and chat_id blank here.
+# Get a bot_token from @BotFather; get your chat_id from @userinfobot.
+# ---------------------------------------------------------------------------
+telegram:
+  enabled: true
+  bot_token: ""
+  chat_id: ""

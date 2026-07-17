@@ -7,6 +7,9 @@ __pycache__/
 venv/
 env/
 
+# Secrets / local env
+.env
+
 # Logs & reports
 logs/*.log
 logs/*.json

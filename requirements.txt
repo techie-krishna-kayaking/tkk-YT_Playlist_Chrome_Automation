@@ -3,6 +3,10 @@ PyYAML>=6.0.1
 loguru>=0.7.2
 psutil>=5.9.8
 
+# Uses the OS trust store (macOS Keychain / Windows cert store) for HTTPS so
+# Telegram notifications work behind TLS-inspecting corporate proxies.
+truststore>=0.9.0
+
 # Optional: browser automation / playback control (used only when
 # playback.mode == "playwright"). Install with: playwright install chromium
 playwright>=1.44.0

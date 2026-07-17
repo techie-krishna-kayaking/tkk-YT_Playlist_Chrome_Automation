@@ -13,14 +13,17 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 from pathlib import Path
 
 from loguru import logger
 
 from automation import __version__
-from automation.config import ConfigError, load_config
+from automation.chrome import terminate_chrome
+from automation.config import AppConfig, ConfigError, load_config
 from automation.launcher import Launcher
 from automation.logging_utils import setup_logging
+from automation.notifier import TelegramNotifier
 
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_CONFIG = BASE_DIR / "config" / "config.yaml"
@@ -81,6 +84,67 @@ def _split_profiles(value: str | None) -> list[str] | None:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _run_scheduled(
+    config: AppConfig,
+    launcher: Launcher,
+    notifier: TelegramNotifier,
+    profile_override: list[str] | None,
+) -> int:
+    """Run the repeating play -> close Chrome -> wait -> relaunch cycle.
+
+    Loops forever (or until ``schedule.max_cycles``), sending a Telegram update
+    after every launch and after every Chrome shutdown.
+    """
+    sched = config.schedule
+    play_seconds = sched.play_hours * 3600.0
+    cooldown_seconds = sched.cooldown_minutes * 60.0
+    cycle = 0
+
+    logger.info(
+        "Scheduler enabled: play {:g}h -> close Chrome -> wait {:g}min -> repeat"
+        "{}.",
+        sched.play_hours,
+        sched.cooldown_minutes,
+        f" (max {sched.max_cycles} cycles)" if sched.max_cycles else " (forever)",
+    )
+
+    while True:
+        cycle += 1
+        logger.info("################  CYCLE {}  ################", cycle)
+
+        report = launcher.run(profile_override=profile_override)
+        launcher.write_report(report, BASE_DIR)
+
+        notifier.send(
+            f"🟢 TKK Playlist — cycle {cycle} started\n"
+            f"Opened {report.succeeded}/{report.total_profiles} Chrome "
+            f"profile(s) with playlists (loop + shuffle).\n"
+            f"Playing for {sched.play_hours:g} hour(s)."
+        )
+
+        logger.info("Playing for {:g} hour(s)...", sched.play_hours)
+        time.sleep(max(0.0, play_seconds))
+
+        terminate_chrome()
+        notifier.send(
+            f"🔴 TKK Playlist — cycle {cycle} ended\n"
+            f"Closed all Chrome windows."
+            + (
+                ""
+                if (sched.max_cycles and cycle >= sched.max_cycles)
+                else f"\nWaiting {sched.cooldown_minutes:g} minute(s) before the "
+                "next cycle."
+            )
+        )
+
+        if sched.max_cycles and cycle >= sched.max_cycles:
+            logger.info("Reached max_cycles={}. Stopping scheduler.", sched.max_cycles)
+            return 0
+
+        logger.info("Cooling down for {:g} minute(s)...", sched.cooldown_minutes)
+        time.sleep(max(0.0, cooldown_seconds))
+
+
 def main(argv: list[str] | None = None) -> int:
     """Program entry point. Returns a process exit code."""
     args = parse_args(argv)
@@ -114,8 +178,14 @@ def main(argv: list[str] | None = None) -> int:
         print()
         return 0
 
+    profile_override = _split_profiles(args.profiles)
+    notifier = TelegramNotifier(config.telegram)
+
     try:
-        report = launcher.run(profile_override=_split_profiles(args.profiles))
+        if config.schedule.enabled and not args.dry_run:
+            return _run_scheduled(config, launcher, notifier, profile_override)
+
+        report = launcher.run(profile_override=profile_override)
     except KeyboardInterrupt:
         logger.warning("Interrupted by user. Exiting.")
         return 130
