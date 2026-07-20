@@ -290,24 +290,31 @@ class WindowManager:
             return None
 
     def arrange_single(self, cell: GridCell, title_hint: str, retries: int = 5) -> bool:
-        """Move/resize a single window identified by a title hint.
+        """Move/resize a single window into its grid cell.
 
         Args:
             cell: Target rectangle.
-            title_hint: Substring to match the window title (e.g. profile name
-                or a page title).
+            title_hint: Substring to match the window title (Windows only).
             retries: How many times to poll for the window to appear.
 
         Returns:
             True on success, False if the window could not be arranged.
         """
-        if not Platform.is_windows() or self._gw is None:
-            logger.debug(
-                "Window arrangement skipped (platform={}, pygetwindow={}). "
-                "Relying on Chrome --window-position/size.",
-                Platform.name(),
-                self._gw is not None,
-            )
+        if Platform.is_windows():
+            return self._arrange_windows(cell, title_hint, retries)
+        if Platform.is_macos():
+            return self._arrange_macos(cell, retries)
+        logger.debug(
+            "Window arrangement not supported on {}; relying on Chrome launch "
+            "flags.",
+            Platform.name(),
+        )
+        return False
+
+    def _arrange_windows(self, cell: GridCell, title_hint: str, retries: int) -> bool:
+        """Windows: move/resize via pygetwindow, matched by title."""
+        if self._gw is None:
+            logger.debug("pygetwindow unavailable; cannot arrange windows.")
             return False
 
         for _ in range(max(1, retries)):
@@ -332,3 +339,106 @@ class WindowManager:
 
         logger.debug("Window matching '{}' not found for arrangement.", title_hint)
         return False
+
+    def _arrange_macos(self, cell: GridCell, retries: int) -> bool:
+        """macOS: set the newest Chrome window's bounds via AppleScript.
+
+        Chrome ignores --window-position/--window-size for extra windows opened
+        in an already-running process, so we position the front-most (most
+        recently opened) Chrome window into its grid cell instead. ``bounds`` is
+        ``{left, top, right, bottom}`` in screen pixels.
+
+        Requires the controlling app (Terminal / VS Code) to have Automation
+        permission for "Google Chrome"; macOS prompts once on first use.
+        """
+        left, top = cell.x, cell.y
+        right, bottom = cell.x + cell.width, cell.y + cell.height
+        script = (
+            'tell application "Google Chrome"\n'
+            "  if (count of windows) is 0 then return \"no-window\"\n"
+            f"  set bounds of front window to {{{left}, {top}, {right}, {bottom}}}\n"
+            '  return "ok"\n'
+            "end tell"
+        )
+
+        for _ in range(max(1, retries)):
+            try:
+                result = subprocess.run(
+                    ["osascript", "-e", script],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0 and "ok" in result.stdout:
+                    logger.debug(
+                        "Arranged macOS Chrome window -> ({}, {}) {}x{}",
+                        left,
+                        top,
+                        cell.width,
+                        cell.height,
+                    )
+                    return True
+                message = (result.stderr or result.stdout).strip()
+                if message:
+                    logger.debug("osascript arrange did not apply: {}", message)
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("macOS window arrange error: {}", exc)
+            time.sleep(0.5)
+
+        return False
+
+    def prime_tabs(self, tab_count: int, per_tab_delay: float = 1.5) -> int:
+        """Briefly activate each tab of the newest Chrome window in turn.
+
+        YouTube only builds its ``<video>`` player once a tab becomes visible,
+        so background tabs never start on their own. Cycling the active tab
+        forces each player to initialise and begin playback; the loop extension
+        then keeps it going after we move on. Leaves the window on its first tab.
+
+        macOS only (AppleScript); a no-op elsewhere.
+
+        Args:
+            tab_count: Expected number of tabs (used to size the timeout).
+            per_tab_delay: Seconds to keep each tab active before the next.
+
+        Returns:
+            The number of tabs cycled, or 0 if nothing was done.
+        """
+        if not Platform.is_macos():
+            return 0
+
+        delay = max(0.0, per_tab_delay)
+        script = (
+            'tell application "Google Chrome"\n'
+            '  if (count of windows) is 0 then return "0"\n'
+            "  set theWindow to front window\n"
+            "  set n to count of tabs of theWindow\n"
+            "  repeat with i from 1 to n\n"
+            "    set active tab index of theWindow to i\n"
+            f"    delay {delay}\n"
+            "  end repeat\n"
+            "  set active tab index of theWindow to 1\n"
+            '  return "" & n\n'
+            "end tell"
+        )
+        timeout = max(15.0, tab_count * (delay + 1.0) + 10.0)
+        try:
+            result = subprocess.run(
+                ["osascript", "-e", script],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            if result.returncode == 0:
+                try:
+                    cycled = int(result.stdout.strip())
+                except ValueError:
+                    cycled = 0
+                logger.debug("Primed {} tab(s) to start playback.", cycled)
+                return cycled
+            message = (result.stderr or result.stdout).strip()
+            if message:
+                logger.debug("Tab priming did not apply: {}", message)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("macOS tab priming error: {}", exc)
+        return 0

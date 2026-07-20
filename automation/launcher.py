@@ -243,6 +243,18 @@ class Launcher:
         if self._windows.arrange_single(cell, title_hint=profile.display_name):
             record.windows_arranged = 1
 
+        # Cycle through the tabs so each one starts playing (background tabs do
+        # not auto-start until shown once).
+        if (
+            self._config.playback.autoplay
+            and self._config.playback.prime_tabs
+            and len(self._playlists) > 1
+        ):
+            self._windows.prime_tabs(
+                tab_count=len(self._playlists),
+                per_tab_delay=self._config.playback.prime_tab_delay,
+            )
+
         # Drive playback if requested via Playwright.
         if self._config.playback.autoplay and self._config.playback.mode == "playwright":
             self._drive_playback(port, record, plog)

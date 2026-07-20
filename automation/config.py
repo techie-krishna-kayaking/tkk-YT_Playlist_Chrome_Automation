@@ -116,6 +116,11 @@ class PlaybackConfig:
     loop: bool = True
     mode: str = "native"  # "native" | "playwright"
     remote_debugging_port: int = 9222
+    # After a profile's tabs open, briefly activate each tab in turn so YouTube
+    # initialises its player and starts playback (background tabs never build a
+    # <video> element until shown). macOS only (via AppleScript).
+    prime_tabs: bool = True
+    prime_tab_delay: float = 1.5
     play_selectors: list[str] = field(
         default_factory=lambda: [
             "button[aria-label='Play']",
@@ -137,6 +142,8 @@ class PlaybackConfig:
             loop=bool(data.get("loop", True)),
             mode=mode,
             remote_debugging_port=int(data.get("remote_debugging_port", 9222)),
+            prime_tabs=bool(data.get("prime_tabs", True)),
+            prime_tab_delay=max(0.0, float(data.get("prime_tab_delay", 1.5))),
         )
         if selectors:
             cfg.play_selectors = [str(s) for s in selectors]

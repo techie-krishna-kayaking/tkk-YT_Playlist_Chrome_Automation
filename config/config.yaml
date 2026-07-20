@@ -99,6 +99,13 @@ playback:
   #          extensions" prompt; just dismiss it (click the X) to keep it on.
   # false -> stop when the playlist ends.
   loop: true
+  # After a profile's tabs open, briefly switch through each tab so every video
+  # starts playing. Background tabs never build a player until shown once, so
+  # without this only the visible tab plays. (macOS only.)
+  prime_tabs: true
+  # Seconds to keep each tab active while priming it (higher = more reliable
+  # start on slow connections, but slower overall). ~1.5s is usually enough.
+  prime_tab_delay: 1.5
   # How playback is driven:
   #   native     -> rely on the URL / Chrome autoplay only (no automation lib).
   #   playwright -> connect via remote debugging and click/space to force play.
