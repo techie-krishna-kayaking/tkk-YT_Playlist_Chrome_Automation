@@ -216,6 +216,7 @@ class ScheduleConfig:
     play_hours: float = 5.0
     cooldown_minutes: float = 9.0
     max_cycles: int = 0  # 0 = repeat forever
+    prevent_sleep: bool = True
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any] | None) -> "ScheduleConfig":
@@ -229,6 +230,7 @@ class ScheduleConfig:
             play_hours=play_hours,
             cooldown_minutes=cooldown_minutes,
             max_cycles=max(0, int(data.get("max_cycles", 0))),
+            prevent_sleep=bool(data.get("prevent_sleep", True)),
         )
 
 

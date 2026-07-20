@@ -157,6 +157,10 @@ schedule:
   cooldown_minutes: 9
   # Stop after this many cycles. 0 = repeat forever.
   max_cycles: 0
+  # Keep the computer (and display) awake for the whole run so it never sleeps
+  # during playback or the cooldown, which would break the next relaunch.
+  # macOS: caffeinate | Windows: SetThreadExecutionState | Linux: systemd-inhibit
+  prevent_sleep: true
 
 # ---------------------------------------------------------------------------
 # Telegram notifications (optional).

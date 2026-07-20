@@ -24,6 +24,7 @@ from automation.config import AppConfig, ConfigError, load_config
 from automation.launcher import Launcher
 from automation.logging_utils import setup_logging
 from automation.notifier import TelegramNotifier
+from automation.power import KeepAwake
 
 BASE_DIR = Path(__file__).resolve().parent
 DEFAULT_CONFIG = BASE_DIR / "config" / "config.yaml"
@@ -108,41 +109,50 @@ def _run_scheduled(
         f" (max {sched.max_cycles} cycles)" if sched.max_cycles else " (forever)",
     )
 
-    while True:
-        cycle += 1
-        logger.info("################  CYCLE {}  ################", cycle)
+    keep_awake = KeepAwake() if sched.prevent_sleep else None
+    if keep_awake is not None:
+        keep_awake.start()
+    try:
+        while True:
+            cycle += 1
+            logger.info("################  CYCLE {}  ################", cycle)
 
-        report = launcher.run(profile_override=profile_override)
-        launcher.write_report(report, BASE_DIR)
+            report = launcher.run(profile_override=profile_override)
+            launcher.write_report(report, BASE_DIR)
 
-        notifier.send(
-            f"🟢 TKK Playlist — cycle {cycle} started\n"
-            f"Opened {report.succeeded}/{report.total_profiles} Chrome "
-            f"profile(s) with playlists (loop + shuffle).\n"
-            f"Playing for {sched.play_hours:g} hour(s)."
-        )
-
-        logger.info("Playing for {:g} hour(s)...", sched.play_hours)
-        time.sleep(max(0.0, play_seconds))
-
-        terminate_chrome()
-        notifier.send(
-            f"🔴 TKK Playlist — cycle {cycle} ended\n"
-            f"Closed all Chrome windows."
-            + (
-                ""
-                if (sched.max_cycles and cycle >= sched.max_cycles)
-                else f"\nWaiting {sched.cooldown_minutes:g} minute(s) before the "
-                "next cycle."
+            notifier.send(
+                f"🟢 TKK Playlist — cycle {cycle} started\n"
+                f"Opened {report.succeeded}/{report.total_profiles} Chrome "
+                f"profile(s) with playlists (loop + shuffle).\n"
+                f"Playing for {sched.play_hours:g} hour(s)."
             )
-        )
 
-        if sched.max_cycles and cycle >= sched.max_cycles:
-            logger.info("Reached max_cycles={}. Stopping scheduler.", sched.max_cycles)
-            return 0
+            logger.info("Playing for {:g} hour(s)...", sched.play_hours)
+            time.sleep(max(0.0, play_seconds))
 
-        logger.info("Cooling down for {:g} minute(s)...", sched.cooldown_minutes)
-        time.sleep(max(0.0, cooldown_seconds))
+            terminate_chrome()
+            notifier.send(
+                f"🔴 TKK Playlist — cycle {cycle} ended\n"
+                f"Closed all Chrome windows."
+                + (
+                    ""
+                    if (sched.max_cycles and cycle >= sched.max_cycles)
+                    else f"\nWaiting {sched.cooldown_minutes:g} minute(s) before "
+                    "the next cycle."
+                )
+            )
+
+            if sched.max_cycles and cycle >= sched.max_cycles:
+                logger.info(
+                    "Reached max_cycles={}. Stopping scheduler.", sched.max_cycles
+                )
+                return 0
+
+            logger.info("Cooling down for {:g} minute(s)...", sched.cooldown_minutes)
+            time.sleep(max(0.0, cooldown_seconds))
+    finally:
+        if keep_awake is not None:
+            keep_awake.stop()
 
 
 def main(argv: list[str] | None = None) -> int:
